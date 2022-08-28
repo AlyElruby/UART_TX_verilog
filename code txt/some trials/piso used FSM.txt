@@ -1,0 +1,151 @@
+module piso	(rst, frame_out, parity_type, stop_bits, data_length,send, baud_out, data_out, p_parity_out, tx_active, tx_done);
+input rst,data_length,send,baud_out,stop_bits;
+input [10:0] frame_out;
+input [1:0] parity_type;
+output reg p_parity_out,tx_active,tx_done;
+output reg data_out;
+reg [3:0] state=4'b0000;
+reg [10:0] frame_o=0;
+always @(parity_type,send,data_length,rst,frame_o)
+begin
+case(parity_type)
+2'b00,2'b01,2'b10:p_parity_out<=0;
+2'b11:
+begin
+if(data_length==0)
+begin
+p_parity_out<=frame_o[2];
+end
+else
+begin
+p_parity_out<=frame_o[3];
+end
+end
+endcase
+end
+always @(posedge baud_out,posedge rst)
+begin
+if(rst==1)
+begin
+	state<=4'b0000;
+	frame_o<=0;
+	tx_active<=0;
+	tx_done<=1;
+end
+else
+begin
+case(state)
+4'b0000:
+	begin
+	if(send)
+	begin
+	 frame_o<=frame_out;
+	 data_out<=1'b0;
+	 tx_active<=1;
+	 tx_done<=0;
+	 state<=4'b0001;
+	end
+	else
+	begin
+	 data_out<=1'b1;
+	 state<=4'b0000;
+	 tx_active<=0;
+	 tx_done<=1;
+	end
+	end
+4'b0001:
+	begin
+
+	data_out<=frame_o[10];
+	state<=4'b0010;
+	end
+4'b0010:
+	begin
+	data_out<=frame_o[9];
+	state<=4'b0011;
+	end
+4'b0011:
+	begin
+	data_out<=frame_o[8];
+	state<=4'b0100;
+	end
+4'b0100:
+	begin
+	data_out<=frame_o[7];
+	state<=4'b0101;
+	end
+4'b0101:
+	begin
+	data_out<=frame_o[6];
+	state<=4'b0110;
+	end
+4'b0110:
+	begin
+	data_out<=frame_o[5];
+	state<=4'b0111;
+	end
+4'b0111:
+	begin
+	data_out<=frame_o[4];
+	if(data_length==1'b1)
+	begin
+	state<=4'b1000;
+	end
+	else if((parity_type==2'b01)||(parity_type==2'b10))
+	begin
+	state<=4'b1001;
+	end
+	else
+	begin
+	state<=4'b1010;
+	end
+	end
+4'b1000:
+	begin
+	data_out<=frame_o[3];
+	if((parity_type==2'b01)||(parity_type==2'b10))
+	begin
+	state<=4'b1001;
+	end
+	else
+	begin
+	state<=4'b1010;
+	end
+	end
+4'b1001:
+	begin
+	if(data_length==1'b0)
+	begin
+	data_out<=frame_o[3];
+	state<=4'b1010;
+	end
+	else
+	begin
+	data_out<=frame_o[2];
+	state<=4'b1010;
+	end
+	end
+4'b1010:
+	begin
+	data_out<=1'b1;
+	tx_active<=0;
+	tx_done<=1;
+	if(stop_bits==0)
+	begin
+	state<=4'b0000;
+	end
+	else
+	begin
+	state<=4'b1011;
+	end
+	end
+4'b1011:
+	begin
+	data_out<=1'b1;
+	state<=4'b0000;
+	end
+endcase
+end
+end 
+endmodule
+

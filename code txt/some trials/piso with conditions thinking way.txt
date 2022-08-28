@@ -1,0 +1,79 @@
+module piso	(rst, frame_out, parity_type, stop_bits, data_length,send, baud_out, data_out, p_parity_out, tx_active, tx_done);
+input rst,data_length,send,baud_out,stop_bits;
+input [10:0] frame_out;
+input [1:0] parity_type;
+output reg p_parity_out,tx_active,tx_done;
+output reg data_out;
+reg unsigned [3:0] counter=0;
+reg unsigned [2:0] data=0;
+reg unsigned [3:0] loop=0;
+reg [10:0] frame_o;
+initial
+begin
+tx_active<=0;
+tx_done<=1;
+p_parity_out<=0;
+data_out<=1;
+end
+always@(data_length)
+begin
+case(data_length)
+1'b0:data<=6;
+1'b1:data<=7;
+endcase
+end
+always @(parity_type)
+begin
+case(parity_type)
+2'b00,2'b01,2'b10:p_parity_out<=0;
+2'b11:p_parity_out<=frame_o[data+1];
+endcase
+end
+always @(posedge baud_out)
+begin
+if(rst)
+begin
+loop<=0;
+counter<=15;
+frame_o<=0;
+end
+else
+begin
+if(send)
+begin
+loop<=11;
+counter<=0;
+frame_o<=frame_out;
+end
+else
+begin
+if(loop)
+begin
+tx_active<=1;
+tx_done<=0;
+if(counter<=data)
+data_out<=frame_o[counter];
+else if((counter==(data+1))&&(parity_type==2'b01)&&(parity_type==2'b10))
+data_out<=frame_o[counter];
+else if(counter==(data+2))
+data_out<=1'b1;
+else if((counter==(data+3))&&(stop_bits==1)) data_out<=1'b1;
+else
+begin
+data_out<=1'b1;
+tx_active<=0;
+tx_done<=1;
+end
+counter<=counter+1;
+loop<=loop-1;
+end
+else
+begin
+data_out<=1'b1;
+tx_active<=0;
+tx_done<=1;
+end
+end
+end
+end
+endmodule
